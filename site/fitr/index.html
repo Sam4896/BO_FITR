@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <base href="../">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive introduction to Bayesian optimization, pullback Fisher geometry, acquisition gradient bounds, and FITR trust regions.">
+  <title>Information Geometry of Bayesian Optimization</title>
+  <link rel="stylesheet" href="katex/katex.min.css">
+  <link rel="stylesheet" href="styles.css?v=20261102-contact">
+  <script defer src="katex/katex.min.js"></script>
+  <script defer src="model.js?v=20261102-contact"></script>
+  <script defer src="notation.js?v=20261102-contact"></script>
+  <script defer src="content.js?v=20261102-contact"></script>
+  <script defer src="transitions.js?v=20261102-contact"></script>
+  <script defer src="results.js?v=20261102-contact"></script>
+  <script defer src="shared.js?v=20261102-contact"></script>
+  <script defer src="app.js?v=20261102-contact"></script>
+</head>
+<body data-experience="fitr">
+  <header class="site-header">
+    <div class="header-brand-block">
+      <a class="wordmark" href="#" aria-label="Return to page 1"><span class="brand-symbol" aria-hidden="true">↗</span> Bayesian Optimization with Fisher Information Geometry <span class="edition">NeurIPS 2026</span></a>
+      <p class="header-credit">Saksham Kiroriwal · Julius Pfrommer · Jürgen Beyerer</p>
+    </div>
+    <nav aria-label="Page actions"><a href="index.html">Overview</a><a href="fitr/index.html">FITR</a>
+      <a href="https://arxiv.org/pdf/2609.31107" target="_blank" rel="noopener">Read the paper <span aria-hidden="true">↗</span></a>
+      <a class="linkedin-contact" href="https://www.linkedin.com/in/saksham4k/" target="_blank" rel="noopener noreferrer" aria-label="Contact Saksham Kiroriwal on LinkedIn"><span class="linkedin-mark" aria-hidden="true">in</span>Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="explorer immersive-stage" aria-label="Interactive explorer">
+      <header class="stage-header">
+        <div class="stage-header-main">
+          <p class="stage-kicker" id="stage-kicker">01 / 04</p>
+          <h2 class="stage-title" id="stage-title">Bayesian optimization loop</h2>
+        </div>
+        <nav class="page-dots" id="page-dots" aria-label="Pages"></nav>
+
+      </header>
+
+      <div class="stage-workspace" id="stage-workspace">
+        <div id="stage-page0" class="page-stage">
+          <p class="page0-lead" id="page0-lead"></p>
+          <ul class="symbol-badges" id="page0-badges" aria-label="Essential notation"></ul>
+          <div class="bo-loop-toolbar">
+            <button type="button" id="bo-play" class="outline-button">Play BO loop</button>
+            <button type="button" id="bo-step" class="outline-button">Next step</button>
+            <button type="button" id="bo-reset" class="text-button">Reset loop</button>
+            <span id="bo-loop-status" class="bo-loop-status" aria-live="polite"></span>
+          </div>
+          <div class="page0-layout bo-visual-grid">
+            <figure class="bo-cycle-card plot-card" id="bo-cycle-card">
+              <figcaption><span><b>Bayesian optimization loop</b><small>Sequential cycle: fit, select, run, and update</small></span><span class="figure-number">A</span></figcaption>
+              <svg id="bo-cycle-svg" viewBox="0 0 500 300" role="img" aria-label="Circular Bayesian optimization loop"></svg>
+              <div class="legend"><span class="active-step-key">Current step</span><span class="loop-edge-key">Remaining loop</span></div>
+              <p id="bo-phase-description" class="bo-phase-description"></p>
+            </figure>
+            <div class="page0-plots">
+              <figure class="plot-card" id="bo-surrogate-card">
+                <figcaption><span id="bo-surrogate-caption"><b>Model prediction</b><small>Surrogate posterior <span class="tex-inline" data-tex="\probability(\obsouts\mid\inpvars,\observeddata_{\boiteration})">p(y|x,D_t)</span> vs. hidden process</small></span><span class="figure-number">B</span></figcaption>
+                <svg id="bo-surrogate-plot" viewBox="0 0 500 300" role="img" aria-label="Surrogate GP posterior, hidden response, and observed points"></svg>
+                <div class="legend">
+                  <span class="mean-key">Mean <span class="tex-inline" data-tex="\distmean_{\boiteration,\inpvars}">μ_{t,x}</span></span>
+                  <span class="band-key"><span class="tex-inline" data-tex="\pm 2\sqrt{\distcov_{\boiteration,\inpvars}}">±2√Σ_{t,x}</span></span>
+                  <span class="true-key">True <span class="tex-inline" data-tex="\processfunction_{\mathrm{true}}(\inpvars)">f_true(x)</span></span>
+                  <span class="point-key">Data <span class="tex-inline" data-tex="\observeddata_{\boiteration}">D_t</span></span>
+                </div>
+              </figure>
+              <figure class="plot-card" id="bo-acquisition-card">
+                <figcaption><span id="bo-acquisition-caption"><b>Acquisition function</b><small>Expected improvement <span class="tex-inline" data-tex="\acqf(\inpvars;\observeddata_{\boiteration})">α(x;D_t)</span> and next query</small></span><span class="figure-number">C</span></figcaption>
+                <svg id="bo-acquisition-plot" viewBox="0 0 500 300" role="img" aria-label="Acquisition function across the input domain"></svg>
+                <div class="legend">
+                  <span class="gradient-key">Acquisition <span class="tex-inline" data-tex="\acqf(\inpvars;\observeddata_{\boiteration})">α(x;D_t)</span></span>
+                  <span class="candidate-key">Next experiment <span class="tex-inline" data-tex="\inpvars_{\boiteration+1}">x_{t+1}</span></span>
+                </div>
+              </figure>
+            </div>
+          </div>
+          <p class="demo-note">The surrogate model observes only the measured data <span class="tex-inline" data-tex="\observeddata_{\boiteration}">D_t</span>; the dashed curve <span class="tex-inline" data-tex="\processfunction_{\mathrm{true}}(\inpvars)">f_true(x)</span> is shown for reference.</p>
+        </div>
+
+        <section id="stage-explore" class="page-stage explore-choices" hidden aria-label="Choose a paper experience">
+          <p class="explore-intro">Explore what this perspective tells us about Bayesian optimization.</p>
+          <div class="paper-choice-grid">
+            <a class="paper-choice fitr-choice" href="fitr/index.html"><span class="eyebrow">NeurIPS 2026</span><h3>FITR</h3><p>Predictive geometry, acquisition-gradient bounds, and Fisher-information trust regions.</p><span class="choice-action">Explore FITR &rarr;</span></a>
+            <div class="paper-choice boing-choice unavailable" aria-disabled="true"><span class="eyebrow">Coming soon</span><h3>Further ideas</h3><p>Further insights and ideas to be developed here</p></div>
+          </div>
+        </section>
+        <div id="stage-deep-dive" class="page-stage" hidden>
+          <section id="posterior-bridge" class="posterior-bridge" aria-label="From inputs to predictive distributions">
+            <div><p class="eyebrow">Central Idea</p><p>The surrogate is a map from input space <span class="tex-inline" data-tex="\inpvarsset">X</span> to the statistical manifold <span class="tex-inline" data-tex="\manifold">S</span>, and the acquisition function is defined on this manifold.</p><p class="eyebrow">Central Question</p><h3>Can we use this change in perspective to understand the behaviour of Bayesian optimization and also improve it?</h3><p class="plot-footnote">The drawing is schematic; distances on the drawn surface are not Fisher-Rao distances.</p></div>
+            <div><svg id="posterior-bridge-svg" viewBox="0 0 640 340" role="img" aria-label="An animated input maps to a Gaussian predictive distribution through the surrogate model"></svg><button id="bridge-motion" class="text-button" aria-pressed="false">Pause animation</button></div>
+          </section>
+          <div class="unified-control-bar">
+            <label class="position-control" for="input-position"><span id="label-selected-input">Selected input <span class="tex-inline" data-tex="\inpvars">x</span></span> <output id="input-value" for="input-position">0.380</output>
+              <input id="input-position" type="range" min="0" max="1" step="0.002" value="0.38">
+            </label>
+            <button id="play" class="outline-button" aria-pressed="false">Play scan</button>
+            <button id="reset" class="text-button">Reset</button>
+            <label>Acquisition <span class="tex-inline" data-tex="\acqf">α</span>
+              <select id="acquisition">
+                <option value="EI">Expected improvement (EI)</option>
+                <option value="UCB">Upper confidence bound (UCB)</option>
+                <option value="PI">Probability of improvement (PI)</option>
+              </select>
+            </label>
+            <label for="lengthscale"><span id="label-lengthscale">SE lengthscale <span class="tex-inline" data-tex="\lengthscale">λ</span></span> <output id="lengthscale-value" for="lengthscale">0.10</output>
+              <input id="lengthscale" type="range" min="0.06" max="0.30" step="0.01" value="0.10">
+            </label>
+          </div>
+
+          <div class="deep-dive-grid">
+            <figure class="plot-card deep-row1" id="prediction-card">
+              <figcaption><span id="prediction-caption"><b>Model Prediction</b><small>Predictive mean <span class="tex-inline" data-tex="\distmean_{\boiteration,\inpvars}">μ_{t,x}</span> and variance <span class="tex-inline" data-tex="\distcov_{\boiteration,\inpvars}">Σ_{t,x}</span></small></span><span class="figure-number">A</span></figcaption>
+              <svg id="prediction-plot" viewBox="0 0 500 300" role="img" aria-label="Gaussian-process predictive mean and uncertainty"></svg>
+              <div class="legend">
+                <span class="mean-key">Predictive mean <span class="tex-inline" data-tex="\distmean_{\boiteration,\inpvars}">μ_{t,x}</span></span>
+                <span class="band-key"><span class="tex-inline" data-tex="\pm 2\sqrt{\distcov_{\boiteration,\inpvars}}">±2√Σ_{t,x}</span> band</span>
+                <span class="point-key">Observations <span class="tex-inline" data-tex="\observeddata_{\boiteration}">D_t</span></span>
+              </div>
+            </figure>
+            <figure class="plot-card deep-row1" id="acquisition-card">
+              <figcaption><span><b>Acquisition Function</b><small id="acquisition-subtitle">Expected improvement and local gradient tangent</small></span><span class="figure-number">B</span></figcaption>
+              <svg id="acquisition-plot" viewBox="0 0 500 300" role="img" aria-label="Acquisition value across the input domain"></svg>
+              <div class="legend">
+                <span class="gradient-key">Acquisition value</span>
+                <span class="tangent-key">Local gradient tangent</span>
+                <span class="selected-key">Selected input</span>
+              </div>
+              <div class="plot-footnote">The dashed magenta segment shows the local slope <span class="tex-inline" data-tex="\nabla_{\inpvars}\acqf(\inpvars)">∇_x α(x)</span> at the selected input.</div>
+            </figure>
+
+            <div class="ig-view-box" id="ig-view-box">
+              <div class="ig-view-header">
+                <h3 class="ig-view-title">The Information Geometric View</h3>
+                <span class="ig-view-tag" id="ig-view-tag">Posterior map <span class="tex-inline" data-tex="\manifoldmap_{\boiteration} : \inpvarsset \to \manifold">φ_t : X → S</span> into the statistical manifold</span>
+              </div>
+              <div class="ig-inner-grid" id="ig-inner-grid">
+                <div class="ig-text-block" id="ig-text-block">
+                  <div id="ig-prose-takeaways" class="ig-prose"></div>
+                  <div id="ig-prose-math" class="ig-prose mathematics-prose" hidden></div>
+                </div>
+                <figure class="plot-card ig-panel" id="map-card">
+                  <figcaption><span id="map-caption"><b>Manifold View</b><small>Induced manifold on the input space by the model</small></span><span class="figure-number">C</span></figcaption>
+                  <svg id="map-plot" viewBox="0 0 500 300" role="img" aria-label="Posterior map into mean and variance"></svg>
+                  <div class="legend">
+                    <span class="map-curve-key">Posterior-map trajectory</span>
+                    <span class="map-point-key">Selected input</span>
+                  </div>
+                  <div class="plot-footnote" id="map-readout">One input traces a curve in the mean–variance coordinate chart.</div>
+                </figure>
+                <figure class="plot-card ig-panel" id="bound-card">
+                  <figcaption><span id="bound-caption"><b>Acquisition function gradient upper bound</b><small>Proposition 4.2 in the paper</small></span><span class="figure-number">D</span></figcaption>
+                  <svg id="bound-plot" viewBox="0 0 600 300" role="img" aria-label="Acquisition-gradient norm and upper bound"></svg>
+                  <div class="legend">
+                    <span class="acqf-gradient-key">Acqf Gradient</span>
+                    <button type="button" id="toggle-bound" class="legend-toggle bound-key" aria-pressed="true" title="Toggle upper bound">Upper Bound</button>
+                    <button type="button" id="toggle-trace" class="legend-toggle trace-key" aria-pressed="true" title="Toggle trace of pullback tensor">Trace of pullback tensor</button>
+                  </div>
+                  <p class="plot-footnote">As shown in Proposition 4.2 of the paper, we prove an upper bound for the gradient of the acquisition function. This bound helps in distinguishing the effect of acquisition function choice and model choice on the Bayesian optimization.</p>
+                  <p class="plot-footnote bound-scale-note"><sup>*</sup> The pullback trace uses the right axis. A trace that appears to be zero can still be numerically nonzero because a few large spikes set that scale. With finite acquisition sensitivity, a truly zero trace always gives a zero upper bound.</p>
+                </figure>
+              </div>
+            </div>
+            <aside id="page3-optimizer-note" class="page3-optimizer-note" hidden>For commonly used acquisition functions with the Gaussian process model, the trace of the pullback tensor (Fisher information matrix) can help in knowing if the optimizer is able to optimize the acquisition function or not. In the unobserved spaces, we observe vanishing acquisition function gradient behaviour. This is also illustrated on the next page.</aside>
+          </div>
+
+          <article class="proof-scroll" id="page3-proof-box" hidden aria-label="Notation and proof">
+            <div class="proof-paper-header">
+              <span class="eyebrow">Section 4.1 &amp; Appendix D.2–D.4</span>
+              <h3>Notation, Acquisition Gradient Bound, and Complete Proof</h3>
+            </div>
+            <h4>1. Notation &amp; Mathematical Building Blocks</h4>
+            <div id="proof-notation-grid" class="proof-two-col"></div>
+
+            <h4>2. Surrogate Regularity (Assumption 4.1) &amp; Acquisition Gradient Bound (Proposition 4.2)</h4>
+            <p id="proof-assumption-text"></p>
+            <div id="proof-representation" class="equation-block"></div>
+            <div id="proof-prop" class="equation-block"></div>
+            <div id="proof-sens-eq" class="equation-block"></div>
+
+            <h4>3. Complete Proof of Proposition 4.2 (Appendix D.2)</h4>
+            <div class="proof-steps-prose">
+              <section class="proof-step-card"><h5>Step 1 — Chain rule and interchange of differentiation and expectation</h5><div id="proof-step1-eq" class="equation-block"></div><p id="proof-step1-text"></p></section>
+              <section class="proof-step-card"><h5>Step 2 — Fisher metric insertion</h5><div id="proof-step2-eq" class="equation-block"></div><p id="proof-step2-text"></p></section>
+              <section class="proof-step-card"><h5>Step 3 — Cauchy–Schwarz inequality</h5><div id="proof-step3-eq" class="equation-block"></div><p id="proof-step3-text"></p></section>
+              <section class="proof-step-card"><h5>Step 4 — Jensen’s inequality</h5><div id="proof-step4-eq" class="equation-block"></div><p id="proof-step4-text"></p></section>
+            </div>
+
+            <h4>4. Univariate Gaussian Predictive Corollary (Appendix D.3–D.4)</h4>
+            <div id="proof-corollary" class="equation-block"></div>
+            <div id="proof-gaussian-sens" class="equation-block"></div>
+            <p id="proof-corollary-text"></p>
+
+            <h4>5. Written Interpretation from the Paper (Section 4.1)</h4>
+            <div id="proof-interpretation" class="ig-prose"></div>
+          </article>
+        </div>
+
+        <div id="stage-advanced" class="page-stage" hidden>
+          <p class="advanced-lead" id="advanced-lead"></p>
+          <div id="advanced-equation-banner" class="equation-block advanced-eq"></div>
+          <div id="advanced-citations" class="citation-strip" hidden></div>
+          <div id="scene-controls-advanced" class="scene-controls">
+            <div id="controls-geometry" class="control-group" hidden>
+              <label>Dimension <span class="tex-inline" data-tex="\dims{\inpvars}">D_x</span>
+                <select id="lens-dx">
+                  <option value="2">2</option><option value="8">8</option><option value="16">16</option>
+                  <option value="32">32</option><option value="64" selected>64</option>
+                  <option value="128">128</option><option value="256">256</option>
+                </select>
+              </label>
+              <div hidden><input id="lens-active" value="20"><output id="lens-active-value">20</output><input id="lens-radius" value="0.25"><output id="lens-radius-value">0.25</output><input id="lens-lengthscale" value="0.35"><output id="lens-lengthscale-value">0.35</output></div>
+              <div hidden aria-hidden="true">
+                <input id="x1" type="hidden" value="0.45"><output id="x1-value">0.45</output>
+                <input id="x2" type="hidden" value="0.55"><output id="x2-value">0.55</output>
+                <input id="lambda1" type="hidden" value="0.18"><output id="lambda1-value">0.18</output>
+                <input id="lambda2" type="hidden" value="0.30"><output id="lambda2-value">0.30</output>
+              </div>
+            </div>
+            <div id="controls-rayleigh" class="control-group" hidden>
+              <label>Test angle <span class="tex-inline" data-tex="\psi">ψ</span> <output id="psi-value">0°</output><input id="psi" type="range" min="0" max="360" step="1" value="0"></label>
+              <button type="button" id="snap-acquisition" class="outline-button compact">Snap to <span class="tex-inline" data-tex="\mathbf{u}">u</span></button>
+              <button type="button" id="snap-eigen" class="outline-button compact">Snap to <span class="tex-inline" data-tex="\nu_{\max}">ν_max</span></button>
+            </div>
+            <div id="controls-stationary" class="control-group preset-row" hidden>
+              <button type="button" id="preset-flat" class="outline-button compact" data-preset="flat">Case 1: Prior collapse</button>
+              <button type="button" id="preset-parallel" class="outline-button compact" data-preset="singular">Case 2: Collinear, same direction (<span class="tex-inline" data-tex="\cos\theta = +1">cos θ = +1</span>)</button>
+              <button type="button" id="preset-antiparallel" class="outline-button compact" data-preset="cancellation">Case 3: Collinear, opposite directions (<span class="tex-inline" data-tex="\cos\theta = -1">cos θ = −1</span>)</button>
+              <button type="button" id="preset-free" class="outline-button compact" data-preset="free">Free 2D point</button>
+            </div>
+            <div id="controls-highdim" class="control-group" hidden>
+              <label>Dimension <span class="tex-inline" data-tex="D_x">D_x</span>
+                <select id="highdim-dx">
+                  <option value="2">2</option><option value="8">8</option><option value="16">16</option>
+                  <option value="32" selected>32</option><option value="64">64</option><option value="128">128</option><option value="256">256</option>
+                </select>
+              </label>
+              <label>Scaling <span class="tex-inline" data-tex="\lengthscale = c\,\dims{\inpvars}^p">\ell = c D_x^p</span>
+                <select id="highdim-p">
+                  <option value="0">p = 0 (fixed)</option>
+                  <option value="0.5" selected>p = 0.5 (critical √D_x)</option>
+                  <option value="1">p = 1 (over-scaled)</option>
+                </select>
+              </label>
+            </div>
+            <div id="controls-fitr" class="control-group" hidden>
+              <div hidden><input id="fitr-x1" value="0.50"><output id="fitr-x1-value">0.50</output><input id="fitr-x2" value="0.50"><output id="fitr-x2-value">0.50</output></div>
+              <button type="button" id="fitr-animation" class="outline-button" aria-pressed="false">Start animation</button><span id="fitr-current-center"></span>
+              <label>Surrogate
+                <select id="fitr-kernel"><option value="SE">ARD SE GP</option><option value="IBNN">IBNN GP (depth 3)</option></select>
+              </label>
+              <label>Trust length <span class="tex-inline" data-tex="\kappa_t">κ_t</span> <output id="fitr-kappa-value">0.28</output><input id="fitr-kappa" type="range" min="0.12" max="0.55" step="0.01" value="0.28"></label>
+            </div>
+          </div>
+          <section id="page5-theory-block" class="page5-theory-block" hidden aria-label="Companion-matrix derivation">
+            <p>As mentioned in <a href="https://arxiv.org/pdf/2609.31107" target="_blank" rel="noopener">Section 4.1 of the paper</a> and on Page 3 of this project page, the acquisition-function gradient can be represented as <span class="math-inline">Aᵀu</span>.</p>
+            <div id="page5-factorization-equation" class="equation-block"></div>
+            <p>For a scalar Gaussian predictive posterior, the two rows of <span class="math-inline">A</span> are the Fisher-scaled input gradients of the predictive mean and variance. The vector <span class="math-inline">u</span> contains the corresponding acquisition derivatives.</p>
+            <div id="page5-factors-equation" class="equation-block"></div>
+            <p>Define the real symmetric positive-semidefinite companion matrix <span class="math-inline">M = AAᵀ</span>; in particular, it is Hermitian. It is only 2 × 2 and shares the same nonzero eigenvalues as the pullback tensor <span class="math-inline">G = AᵀA</span>. Rayleigh's quotient therefore gives the spectral acquisition-gradient bound using the eigenvalues of either <span class="math-inline">M</span> or the nonzero spectrum of <span class="math-inline">G</span>.</p>
+            <div id="page5-spectral-equation" class="equation-block"></div>
+            <p>At an interior stationary point, <span class="math-inline">∇α = 0</span>. On the branch where <span class="math-inline">u ≠ 0</span> and the predictive gradients are nonzero, this forces the smallest eigenvalue to vanish and <span class="math-inline">M</span> to have rank one. Its two rows are collinear; for EI and UCB their positive acquisition derivatives require the mean and variance gradients to point in opposite directions.</p>
+            <div id="page5-stationary-equation" class="equation-block"></div>
+          </section>
+          <section id="page5-stationary-layout" class="page5-stationary-layout" hidden aria-label="Stationary-point geometry">
+            <p class="interaction-callout">Click plot D to inspect the gradient directions at any location. To inspect a stationary point, select one of the labelled points in plot D or a button in the stationary-points box below.</p>
+            <div class="stationary-map-grid">
+              <figure class="plot-card">
+                <figcaption><span><b>True function</b></span><span class="figure-number">A</span></figcaption>
+                <svg id="stationary-true-plot" viewBox="0 0 500 300" role="img" aria-label="True two-dimensional objective"></svg>
+                <div class="legend"><span class="true-field-key">True objective</span><span class="point-key">Observations</span><span class="stationary-selected-key">Selected point</span></div>
+              </figure>
+              <figure class="plot-card">
+                <figcaption><span><b>GP predictive mean</b></span><span class="figure-number">B</span></figcaption>
+                <svg id="stationary-mean-plot" viewBox="0 0 500 300" role="img" aria-label="GP predictive mean field"></svg>
+                <div class="legend"><span class="mean-field-key">Predictive mean</span><span class="point-key">Observations</span><span class="stationary-selected-key">Selected point</span></div>
+              </figure>
+              <figure class="plot-card">
+                <figcaption><span><b>GP predictive variance</b></span><span class="figure-number">C</span></figcaption>
+                <svg id="stationary-variance-plot" viewBox="0 0 500 300" role="img" aria-label="GP predictive variance field"></svg>
+                <div class="legend"><span class="variance-field-key">Predictive variance</span><span class="point-key">Observations</span><span class="stationary-selected-key">Selected point</span></div>
+              </figure>
+              <figure class="plot-card">
+                <figcaption><span><b>Expected improvement</b></span><span class="figure-number">D</span></figcaption>
+                <svg id="stationary-acquisition-plot" class="selectable-2d" viewBox="0 0 500 300" role="img" aria-label="Expected improvement with stationary points"></svg>
+                <div class="legend"><span class="acquisition-field-key">Expected improvement</span><span class="maximum-point-key">Maximum</span><span class="minimum-point-key">Minimum</span><span class="saddle-point-key">Saddle</span><span class="stationary-selected-key">Selected point</span></div>
+              </figure>
+            </div>
+            <div id="stationary-selector" class="stationary-selector" aria-label="Select a stationary point"></div>
+            <div class="stationary-explanation-grid">
+              <figure class="plot-card">
+                <figcaption><span><b>Mean and variance gradient directions</b></span><span class="figure-number">E</span></figcaption>
+                <svg id="stationary-vector-plot" viewBox="0 0 500 300" role="img" aria-label="Collinear predictive gradients pointing in opposite directions at a stationary point"></svg>
+                <div class="legend"><span class="mean-gradient-key">Mean gradient</span><span class="variance-gradient-key">Variance gradient</span><span class="acqf-gradient-key">Acqf gradient</span></div>
+                <div id="stationary-vector-foot" class="plot-footnote"></div>
+              </figure>
+              <figure class="plot-card">
+                <figcaption><span><b>What the companion ellipse reveals</b><small>Companion image at the selected EI location</small></span><span class="figure-number">F</span></figcaption>
+                <svg id="stationary-companion-plot" viewBox="0 0 500 300" role="img" aria-label="Companion ellipse collapsing at a stationary point"></svg>
+                <div class="legend"><span class="generic-ellipse-key">Companion image</span><span class="stationary-ellipse-key">Smallest-eigenvalue direction</span><span class="acquisition-vector-key">Acquisition vector u</span></div>
+                <div id="stationary-companion-foot" class="plot-footnote"></div>
+              </figure>
+            </div>
+            <div class="stationary-conclusion"><b>So what?</b> For the nonzero-gradient branch of an interior stationary point, the mean and variance gradients are collinear and point in opposite directions. Then <span class="math-inline">A</span> and <span class="math-inline">M = AAᵀ</span> become rank one, the companion ellipse collapses to a line, and the acquisition vector lies in the null direction. Points where both predictive gradients vanish form a separate branch.</div>
+          </section>
+          <div class="plot-grid" id="advanced-plot-grid">
+            <figure class="plot-card" id="advanced-card-a">
+              <figcaption><span><b id="advanced-title-a">Panel A</b><small id="advanced-subtitle-a"></small></span><span class="figure-number">A</span></figcaption>
+              <svg id="advanced-plot-a" class="advanced-plot selectable-2d" viewBox="0 0 500 300" role="img"></svg>
+              <div class="legend dynamic-legend" id="advanced-legend-a"></div>
+              <div class="plot-footnote" id="advanced-foot-a"></div>
+            </figure>
+            <figure class="plot-card" id="advanced-card-b">
+              <figcaption><span><b id="advanced-title-b">Panel B</b><small id="advanced-subtitle-b"></small></span><span class="figure-number">B</span></figcaption>
+              <svg id="advanced-plot-b" class="advanced-plot selectable-2d" viewBox="0 0 500 300" role="img"></svg>
+              <div class="legend dynamic-legend" id="advanced-legend-b"></div>
+              <div class="plot-footnote" id="advanced-foot-b"></div>
+            </figure>
+            <figure class="plot-card" id="advanced-card-c">
+              <figcaption><span><b id="advanced-title-c">Panel C</b><small id="advanced-subtitle-c"></small></span><span class="figure-number">C</span></figcaption>
+              <svg id="advanced-plot-c" class="advanced-plot selectable-2d" viewBox="0 0 500 300" role="img"></svg>
+              <div class="legend dynamic-legend" id="advanced-legend-c"></div>
+              <div class="plot-footnote" id="advanced-foot-c"></div>
+            </figure>
+            <figure class="plot-card" id="advanced-card-d">
+              <figcaption><span><b id="advanced-title-d">Panel D</b><small id="advanced-subtitle-d"></small></span><span class="figure-number">D</span></figcaption>
+              <svg id="advanced-plot-d" class="advanced-plot" viewBox="0 0 500 300" role="img"></svg>
+              <div class="legend dynamic-legend" id="advanced-legend-d"></div>
+              <div class="plot-footnote" id="advanced-foot-d"></div>
+            </figure><aside id="fitr-explanation" class="fitr-explanation" hidden><h3>From the bound to a search region</h3><p>The pullback Fisher tensor describes how the predictive distribution changes locally. FITR uses its diagonal to set the relative widths of an axis-aligned trust region.</p><p>Regularization limits stretching in insensitive directions. Volume normalization separates the region's shape from its overall size.</p><div id="fitr-math" class="equation" hidden></div><h3>Beyond lengthscale-based models</h3><p>The weights require predictive derivatives, not kernel lengthscales. The construction also applies to other differentiable probabilistic surrogates with a valid Fisher metric.</p><p class="plot-footnote">Try the IBNN kernel and move the center. It has no coordinate lengthscale parameters; FITR still computes its shape from the predictive derivatives.</p></aside>
+          </div>
+          <details id="trace-demo-details" class="trace-demo-details" hidden><summary>What is computed in these two plots?</summary><p>Both plots use the exact pullback trace of an SE GP with one observation at the center of the unit cube, observed output 1, signal variance 1, and observation-noise variance 0.1. Each point averages 64 deterministic queries. Global queries are uniform in the cube. Local queries perturb min(20, D) distinct coordinates by at most 0.25 around the observation. This fixed-size local sampling illustrates RAASP; it does not reproduce every RAASP implementation.</p><p>The second plot uses the same global queries under four lengthscale rules: fixed scaling with p = 0, a representative subcritical rule p = 0.25, the critical rule p = 0.5, and a representative supercritical rule p = 0.75, with lengthscale 0.35 times D to the power p. The lengthscales are set directly, not learned from a prior. Values below 10 to the power of -7 are shown at the bottom of the log-scale plots. These are controlled illustrations, not BO performance comparisons or universal finite-dimensional orderings.</p></details>
+          <section id="fitr-results" class="fitr-results" hidden><h3>Results from the paper</h3><p>GP with an SE kernel. Final best observed value, mean &plusmn; standard error; lower is better. Positive percentage improvement favors FITR-REI.</p><div class="fitr-table-scroll"><table><thead><tr><th>Problem</th><th>TuRBO-REI</th><th>FITR-REI</th><th>Improvement (%)</th></tr></thead><tbody><tr class="fitr-better"><td>Hopper (33D)</td><td>-1312.41 &plusmn; 231.02</td><td>-1536.81 &plusmn; 242.86</td><td>+17.10</td></tr><tr class="fitr-better"><td>HPA102-1 (32D)</td><td>219.01 &plusmn; 0.82</td><td>218.99 &plusmn; 0.60</td><td>+0.01</td></tr><tr><td>LassoDNA (180D)</td><td>0.29195 &plusmn; 0.00093</td><td>0.29263 &plusmn; 0.00066</td><td>-0.24</td></tr><tr class="fitr-better"><td>Lunarlander (12D)</td><td>-283.66 &plusmn; 9.69</td><td>-293.36 &plusmn; 23.62</td><td>+3.42</td></tr><tr class="fitr-better"><td>MOPTA08 (124D)</td><td>216.40 &plusmn; 0.46</td><td>215.70 &plusmn; 0.27</td><td>+0.32</td></tr><tr class="fitr-better"><td>RobotPushing (14D)</td><td>-5.43 &plusmn; 0.40</td><td>-6.45 &plusmn; 0.54</td><td>+18.79</td></tr><tr class="fitr-better"><td>Rover (60D)</td><td>-2.63 &plusmn; 0.55</td><td>-3.58 &plusmn; 0.19</td><td>+36.18</td></tr><tr><td>SVM (388D)</td><td>0.05336 &plusmn; 0.00306</td><td>0.05780 &plusmn; 0.00613</td><td>-8.32</td></tr><tr><td>Swimming (16D)</td><td>-358.25 &plusmn; 1.80</td><td>-340.55 &plusmn; 17.87</td><td>-4.94</td></tr></tbody></table></div><p>FITR has a lower mean on six of nine tasks. The gains are task-dependent. On the tested subset, the full-tensor variant did not outperform diagonal FITR.</p><p class="plot-footnote">Source: Table 2 and the Results section. Percentages describe relative objective changes, not regret reduction or statistical significance.</p><a href="https://arxiv.org/pdf/2609.31107" target="_blank" rel="noopener">Read the paper and experimental details</a></section><p class="interaction-hint" id="interaction-hint"></p>
+        </div>
+      </div>
+      <a id="continue-fitr" class="continue-fitr" href="fitr/index.html" hidden>Explore the NeurIPS paper: bounds, stationary points, and FITR &rarr;</a>
+      <p class="stage-source" id="source-reference"></p>
+      <a id="back-overview" class="continue-fitr back-overview" href="index.html" hidden>Go back to overview page</a>
+    </section>
+
+    <section class="reading-notes" hidden aria-label="Interpretation and model details">
+      <div class="closing-note"><div class="eyebrow">The takeaway</div><h2>Two factors govern the acquisition gradient.</h2><p>The posterior map determines how the predictive distribution changes with the input. The acquisition function determines how its expected utility responds to that predictive change. A small upper bound forces a small gradient; a large upper bound still permits a zero gradient when mean and variance pulls oppose and cancel.</p></div>
+      <div class="notes-list">
+        <details open><summary>What is this example &amp; numerical setup?</summary>
+          <p>Pages 2–3 use five fixed observations, a zero-mean SE Gaussian process (signal variance 1, observation noise variance 0.0025), and latent predictive variance at the query point. Page 1 illustrates an iterative BO loop starting from three observations. Page 4 uses a controlled one-observation GP to compare trace decay. Pages 5–7 use the existing 2D geometry examples and trust-region comparison.</p>
+        </details>
+        <details><summary>Where does the geometry enter?</summary>
+          <p>The mean–variance plane is a coordinate chart for the scalar Gaussian predictive manifold. The Fisher–Rao metric measures local distributional change on that manifold, and its pullback through the posterior map measures input-space sensitivity.</p>
+        </details>
+      </div>
+    </section>
+
+
+
+    <footer><span>Bayesian Optimization with Fisher Information Geometry · NeurIPS 2026</span><span>Saksham Kiroriwal · Julius Pfrommer · Jürgen Beyerer</span></footer>
+  </main>
+
+  <button type="button" id="prev-page" class="edge-nav edge-nav-prev" aria-label="Previous page">
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button type="button" id="next-page" class="edge-nav edge-nav-next" aria-label="Next page">
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M9.5 5.5L16 12l-6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button type="button" id="previous" hidden tabindex="-1" aria-hidden="true">←</button>
+  <button type="button" id="next" hidden tabindex="-1" aria-hidden="true">→</button>
+  <span id="step-count" hidden aria-hidden="true">01 / 04</span>
+
+  <noscript><p class="no-script">Enable JavaScript to explore the computed example.</p></noscript>
+</body>
+</html>
